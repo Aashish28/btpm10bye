@@ -1,0 +1,110 @@
+_schema-version: "3.2"
+ID: byemta
+version: 0.0.1
+modules:
+- name: byemta-approuter
+  type: approuter.nodejs
+  path: byemta-approuter
+  properties:
+    TENANT_HOST_PATTERN: ^(.*)-${appname}.${default-domain}  
+  requires:
+  - name: byemta_html_repo_runtime
+  - name: uaa_byemta
+  - name: saas-registry
+  - name: byemta-destination-service
+    group: destinations
+    properties:
+      forwardAuthToken: false
+      name: ui5
+      url: https://ui5.sap.com
+  parameters:
+    disk-quota: 512M
+    keep-existing-routes: true
+    memory: 512M
+    routes:
+    - route: https://${subdomain}-${appname}.${default-domain}
+    - route: https://consumer-mmfbi0bx-${appname}.${default-domain}    
+- name: byemta_ui_deployer
+  type: com.sap.application.content
+  path: .
+  requires:
+  - name: byemta_html_repo_host
+    parameters:
+      content-target: true
+  build-parameters:
+    build-result: resources
+    requires:
+    - artifacts:
+      - byemtaui.zip
+      name: byemtaui
+      target-path: resources/
+- name: byemtaui
+  type: html5
+  path: byemtaui
+  build-parameters:
+    build-result: dist
+    builder: custom
+    commands:
+    - npm install
+    - npm run build:cf
+    supported-platforms: []
+resources:
+- name: byemta_html_repo_runtime
+  type: org.cloudfoundry.managed-service
+  parameters:
+    service: html5-apps-repo
+    service-name: ${appname}-html_repo_runtime
+    service-plan: app-runtime
+- name: uaa_byemta
+  type: org.cloudfoundry.managed-service
+  parameters:
+    path: ./xs-security.json
+    service: xsuaa
+    service-name: ${appname}-xsuaa-service
+    service-plan: application
+- name: byemta_html_repo_host
+  type: org.cloudfoundry.managed-service
+  parameters:
+    config:
+      sizeLimit: 8
+    service: html5-apps-repo
+    service-name: ${appname}-html_repo_host
+    service-plan: app-host
+- name: byemta-destination-service
+  type: org.cloudfoundry.managed-service
+  parameters:
+    config:
+      HTML5Runtime_enabled: false
+      init_data:
+        instance:
+          destinations:
+          - Authentication: NoAuthentication
+            Name: ui5
+            ProxyType: Internet
+            Type: HTTP
+            URL: https://ui5.sap.com
+          existing_destinations_policy: update
+      version: 1.0.0
+    service: destination
+    service-name: byemta-destination-service
+    service-plan: lite
+- name: saas-registry
+  type: org.cloudfoundry.managed-service
+  parameters:
+    config:
+      appName: ${appname}
+      appUrls:
+        getDependencies: https://${subdomain}-${appname}.${default-domain}/callback/v1.0/dependencies
+        onSubscription: https://${subdomain}-${appname}.${default-domain}/callback/v1.0/tenants/{tenantId}
+      category: Custom Apps
+      description: A Bye MTA app to explain the concepts of Multitenancy
+      displayName: ByeMTA
+      xsappname: ${appname}
+    service: saas-registry
+    service-name: ${appname}-saas-registry
+    service-plan: application
+parameters:
+  appname: byemta
+  deploy_mode: html5-repo
+  enable-parallel-deployments: true
+  subdomain: 20ca595atrial
